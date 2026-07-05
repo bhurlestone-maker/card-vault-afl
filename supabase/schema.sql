@@ -135,3 +135,38 @@ create policy "users delete own folder" on storage.objects
 -- Old policy names from earlier versions, drop if present (harmless if absent)
 drop policy if exists "signed-in upload card photos" on storage.objects;
 drop policy if exists "signed-in update card photos" on storage.objects;
+
+-- ===== Design update: wishlist, follows, avatar, trade listings =====
+alter table profiles add column if not exists avatar text default '';
+alter table profiles add column if not exists avatar_color text default '#5b2d8e';
+
+create table if not exists wishlist (
+  user_id uuid not null references auth.users on delete cascade,
+  card_key text not null,
+  created_at timestamptz default now(),
+  primary key (user_id, card_key)
+);
+alter table wishlist enable row level security;
+drop policy if exists "own wishlist" on wishlist;
+create policy "own wishlist" on wishlist
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table if not exists follows (
+  follower_id uuid not null references auth.users on delete cascade,
+  followee_id uuid not null references auth.users on delete cascade,
+  created_at timestamptz default now(),
+  primary key (follower_id, followee_id)
+);
+alter table follows enable row level security;
+drop policy if exists "follows readable" on follows;
+create policy "follows readable" on follows for select using (true);
+drop policy if exists "users follow" on follows;
+create policy "users follow" on follows for insert with check (auth.uid() = follower_id);
+drop policy if exists "users unfollow" on follows;
+create policy "users unfollow" on follows for delete using (auth.uid() = follower_id);
+
+alter table listings add column if not exists listing_type text default 'sale';
+alter table listings alter column price drop not null;
+alter table listings drop constraint if exists listings_price_check;
+alter table listings add constraint listings_price_check
+  check (listing_type = 'trade' or price > 0);
