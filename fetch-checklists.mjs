@@ -234,7 +234,68 @@ function merge() {
   console.log("Commit src/lib/afl_cards.json and push to deploy.");
 }
 
+
+// ---------- vintage (pre-Select era from aflfootycards.com) ----------
+const VINTAGE_INDEX = "https://www.aflfootycards.com/footy_card_sets.html";
+const VBRANDS = ["Scanlens", "Stimorol", "Regina", "Kornies", "Dynamic", "Hungry Jacks", "Ardmona"];
+
+async function vintage() {
+  fs.mkdirSync(OUT, { recursive: true });
+  const fails = fs.existsSync(FAILS) ? JSON.parse(fs.readFileSync(FAILS, "utf8")) : [];
+  // Try known URL patterns per year directly; 404s are skipped silently.
+  const base = "https://www.aflfootycards.com/";
+  const links = [];
+  for (let y = 1963; y <= 1993; y++) {
+    links.push(`${base}${y}_scanlens_vfl_cards.html`);
+    links.push(`${base}${y}_scanlens_afl_cards.html`);
+    if (y >= 1988) { links.push(`${base}${y}_stimorol_vfl_cards.html`); links.push(`${base}${y}_stimorol_afl_cards.html`); }
+    if (y >= 1991) { links.push(`${base}${y}_regina_vfl_cards.html`); links.push(`${base}${y}_regina_afl_cards.html`); }
+  }
+  console.log(`Trying ${links.length} candidate vintage pages (missing ones skip quietly)`);
+  for (const u of links) {
+    // quick existence check
+    let resp;
+    try { resp = await fetch(u, { headers: { "User-Agent": "Mozilla/5.0" } }); } catch { continue; }
+    if (!resp.ok) { await sleep(400); continue; }
+    try {
+      const html = await resp.text();
+      // Meta from the URL: 1968_scanlens_vfl_cards.html -> 1968 / Scanlens / VFL
+      const fm = u.match(/(\d{4})_([a-z]+)_([a-z]+)_cards\.html/);
+      if (!fm) continue;
+      const year = parseInt(fm[1]);
+      if (year >= 1994) continue;
+      const brandName = fm[2][0].toUpperCase() + fm[2].slice(1);
+      const setName = fm[3].toUpperCase() === fm[3] ? fm[3] : fm[3].toUpperCase();
+      // Flatten: their checklist is an HTML table, so entries span many lines
+      const text = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&amp;/g, "&").replace(/&quot;|&#8220;|&#8221;/g, '"').replace(/&#8217;|&#39;/g, "'")
+        .replace(/\s+/g, " ");
+      const cards = [];
+      const re = /(\d{1,3}[a-z]?)\s+([A-Za-z][A-Za-z'".\/\- ]{2,38}?)\s*(?:\(RC\))?\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g;
+      let m;
+      while ((m = re.exec(text))) {
+        let player = m[2].replace(/"/g, "").trim();
+        if (/^(Complete|Common|Checklist|Wrapper|Album|Set|Series|Player|Cards?)\b/i.test(player)) continue;
+        cards.push({ mfg: brandName, year, set: "VFL " + setName.replace(/^VFL$/, "Footballers"), variety: "Base", team: "Unknown",
+          player, no: m[1], sku: `${year}${brandName.slice(0,4).toUpperCase()}${m[1]}`, img: "" });
+      }
+      if (cards.length < 10) throw new Error(`only parsed ${cards.length}`);
+      const outFile = path.join(OUT, `${year}-${brandName}-${setName}.json`.replace(/[^\w.-]+/g, "_"));
+      fs.writeFileSync(outFile, JSON.stringify(cards, null, 1));
+      console.log(`${year} ${brandName} ${setName}: ${cards.length} cards`);
+    } catch (e) {
+      fails.push({ url: u, error: String(e.message || e) });
+      console.log(`FAILED ${u}: ${e.message}`);
+    }
+    await sleep(1500);
+  }
+  fs.writeFileSync(FAILS, JSON.stringify(fails, null, 2));
+  console.log("Vintage done. Next: node fetch-checklists.mjs merge");
+}
+
 const cmd = process.argv[2];
 if (cmd === "harvest") harvest();
+else if (cmd === "vintage") vintage();
 else if (cmd === "merge") merge();
-else console.log("Usage: npm install pdf-parse, then: node fetch-checklists.mjs [harvest|merge]");
+else console.log("Usage: npm install pdf-parse, then: node fetch-checklists.mjs [harvest|vintage|merge]");
