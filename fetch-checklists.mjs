@@ -142,17 +142,23 @@ const SETS = [
   [1990, "Stickers", "SEL_1990_AFL_Stickers.pdf"],
 ];
 
-const CLUBS = new Set(["ADELAIDE","BRISBANE","BRISBANE LIONS","BRISBANE BEARS","CARLTON","COLLINGWOOD",
-  "ESSENDON","FITZROY","FOOTSCRAY","FREMANTLE","GEELONG","GOLD COAST","GWS","GWS GIANTS",
-  "GREATER WESTERN SYDNEY","HAWTHORN","MELBOURNE","NORTH MELBOURNE","KANGAROOS","PORT ADELAIDE",
-  "RICHMOND","ST. KILDA","ST KILDA","SYDNEY","WEST COAST","WESTERN BULLDOGS"]);
+const CLUBS = new Set(["ADELAIDE","ADELAIDE CROWS","BRISBANE","BRISBANE LIONS","BRISBANE BEARS","CARLTON",
+  "CARLTON BLUES","COLLINGWOOD","COLLINGWOOD MAGPIES","ESSENDON","ESSENDON BOMBERS","FITZROY","FOOTSCRAY",
+  "FREMANTLE","FREMANTLE DOCKERS","GEELONG","GEELONG CATS","GOLD COAST","GOLD COAST SUNS","GWS","GWS GIANTS",
+  "GREATER WESTERN SYDNEY","GREATER WESTERN SYDNEY GIANTS","HAWTHORN","HAWTHORN HAWKS","MELBOURNE",
+  "MELBOURNE DEMONS","NORTH MELBOURNE","NORTH MELBOURNE KANGAROOS","KANGAROOS","PORT ADELAIDE",
+  "PORT ADELAIDE POWER","RICHMOND","RICHMOND TIGERS","ST. KILDA","ST KILDA","ST KILDA SAINTS","SYDNEY",
+  "SYDNEY SWANS","WEST COAST","WEST COAST EAGLES","WESTERN BULLDOGS"]);
 
 const titleCase = (s) => s.toLowerCase()
   .replace(/(^|[\s'-])([a-z])/g, (m, a, b) => a + b.toUpperCase())
   .replace(/\bMc([a-z])/g, (m, a) => "Mc" + a.toUpperCase());
 
+const JUNK = /\b(Pack|Packs|Box|Boxes|Card|Cards|Per|Rrp|Notice|Season|Stores|Newsagencies|Change|Subject|Images|Only|Australia|Contents|Value|Conditions|Odds|Production|Guaranteed|Cases|Choice|Collector|Collectors)\b/i;
 function parsePdfText(text, meta) {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = text.split(/\r?\n/)
+    .map((l) => l.replace(/[\t\u00a0]+/g, " ").replace(/ {2,}/g, " ").trim())
+    .filter(Boolean);
   const cards = [];
   let team = "Unknown";
   let variety = "Base";
@@ -166,10 +172,10 @@ function parsePdfText(text, meta) {
       continue;
     }
     // Entry: "162 TONY LOCKETT" or "SC11 TRENT CROAD" (allow trailing team/notes)
-    const m = line.match(/^((?:[A-Z]{1,6})?\d{1,3}[a-z]?)\s+([A-Za-z][A-Za-z'.\- ]{2,40}?)\s*$/);
+    const m = line.match(/^((?:[A-Z]{1,6})?\d{1,3}[a-z]?)\s+([A-Za-z][A-Za-z\u2019'.\- ]{2,40}?)\s*$/);
     if (m) {
-      const player = titleCase(m[2].trim());
-      if (/Checklist/i.test(player)) continue;
+      const player = titleCase(m[2].trim().replace(/\u2019/g, "'"));
+      if (/Checklist/i.test(player) || JUNK.test(player)) continue;
       cards.push({ mfg: "Select", year: meta.year, set: meta.set, variety, team,
         player, no: m[1],
         sku: `${meta.year}${meta.set.replace(/[^A-Z0-9]/gi, "").slice(0, 8).toUpperCase()}${variety === "Base" ? "" : "V"}${m[1]}`,

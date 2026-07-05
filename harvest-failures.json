@@ -9,19 +9,7 @@
     "year": 2020,
     "set": "Brilliance",
     "file": "2020Brilliance.pdf",
-    "error": "only parsed 2 entries, needs review"
-  },
-  {
-    "year": 2012,
-    "set": "Champions",
-    "file": "SEL_2012_AFLS2_Champions_Flyer_LR.pdf",
-    "error": "only parsed 3 entries, needs review"
-  },
-  {
-    "year": 2011,
-    "set": "Champions",
-    "file": "SEL_2011_AFLS1_Champions_Flyer_LR.pdf",
-    "error": "only parsed 4 entries, needs review"
+    "error": "only parsed 0 entries, needs review"
   },
   {
     "year": 2009,
